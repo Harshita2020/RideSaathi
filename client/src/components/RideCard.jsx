@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * RideCard renders individual ride listings with modern dashboard aesthetics.
@@ -53,14 +54,19 @@ const RideCard = ({ ride }) => {
     }
   };
 
+  const { user } = useAuth();
   const statusStyle = getStatusStyle(status);
   const driverName = driverId?.name || 'Anonymous Driver';
   const driverInitial = driverName.charAt(0).toUpperCase();
   const seatsBooked = totalSeats - availableSeats;
   const fillPercentage = (seatsBooked / totalSeats) * 100;
 
+  const currentUserId = user?.id || user?._id;
+  const driverIdStr = driverId?._id || driverId?.id || driverId;
+  const isDriver = currentUserId && driverIdStr && (currentUserId.toString() === driverIdStr.toString());
+
   const handleBookClick = () => {
-    alert('Ride Booking is coming soon!');
+    navigate(`/rides/${_id}`);
   };
 
   const handleViewDetails = () => {
@@ -233,16 +239,16 @@ const RideCard = ({ ride }) => {
         <button 
           onClick={handleBookClick}
           className="btn btn-primary" 
-          disabled={availableSeats === 0 || status !== 'CREATED'}
+          disabled={availableSeats === 0 || status !== 'CREATED' || isDriver}
           style={{ 
             flex: 1.5, 
             padding: '10px', 
             fontSize: '13px',
-            opacity: (availableSeats === 0 || status !== 'CREATED') ? 0.5 : 1,
-            cursor: (availableSeats === 0 || status !== 'CREATED') ? 'not-allowed' : 'pointer'
+            opacity: (availableSeats === 0 || status !== 'CREATED' || isDriver) ? 0.5 : 1,
+            cursor: (availableSeats === 0 || status !== 'CREATED' || isDriver) ? 'not-allowed' : 'pointer'
           }}
         >
-          Book Ride
+          {isDriver ? 'Your Ride' : 'Book Ride'}
         </button>
       </div>
     </div>
