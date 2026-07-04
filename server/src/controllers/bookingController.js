@@ -125,16 +125,22 @@ const cancelBooking = async (req, res) => {
       return res.status(400).json({ message: 'Booking is already cancelled' });
     }
 
+    // 3.5. Business Rule: Ensure associated ride is CREATED
+    const ride = await Ride.findById(booking.rideId);
+    if (!ride) {
+      return res.status(404).json({ message: 'Associated ride not found' });
+    }
+    if (ride.status !== 'CREATED') {
+      return res.status(400).json({ message: 'Cannot cancel booking for a ride that has already started, completed, or been cancelled' });
+    }
+
     // 4. Update booking status
     booking.status = 'CANCELLED';
     await booking.save();
 
     // 5. Business Rule: Increase availableSeats when booking is cancelled
-    const ride = await Ride.findById(booking.rideId);
-    if (ride) {
-      ride.availableSeats = Math.min(ride.totalSeats, ride.availableSeats + 1);
-      await ride.save();
-    }
+    ride.availableSeats = Math.min(ride.totalSeats, ride.availableSeats + 1);
+    await ride.save();
 
     return res.status(200).json({
       message: 'Booking cancelled successfully',

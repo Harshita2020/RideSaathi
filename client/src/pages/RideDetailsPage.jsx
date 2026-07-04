@@ -388,23 +388,25 @@ const RideDetailsPage = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #10b98130', borderRadius: 'var(--radius-sm)', padding: '12px 16px', textAlign: 'center' }}>
                     <p style={{ fontSize: '13px', color: '#047857', fontWeight: '700', margin: 0 }}>
-                      🎫 You are booked on this ride!
+                      {ride.status === 'COMPLETED' ? '🎫 You completed this ride!' : ride.status === 'ACTIVE' ? '🎫 You are on this ride!' : '🎫 You are booked on this ride!'}
                     </p>
                   </div>
-                  <button
-                    onClick={handleCancelBooking}
-                    className="btn btn-secondary"
-                    disabled={actionLoading}
-                    style={{ 
-                      width: '100%', 
-                      color: 'var(--danger)', 
-                      borderColor: '#fca5a5', 
-                      backgroundColor: '#fff5f5',
-                      padding: '12px'
-                    }}
-                  >
-                    {actionLoading ? 'Cancelling...' : 'Cancel Booking'}
-                  </button>
+                  {ride.status === 'CREATED' && (
+                    <button
+                      onClick={handleCancelBooking}
+                      className="btn btn-secondary"
+                      disabled={actionLoading}
+                      style={{ 
+                        width: '100%', 
+                        color: 'var(--danger)', 
+                        borderColor: '#fca5a5', 
+                        backgroundColor: '#fff5f5',
+                        padding: '12px'
+                      }}
+                    >
+                      {actionLoading ? 'Cancelling...' : 'Cancel Booking'}
+                    </button>
+                  )}
                 </div>
               ) : (
                 /* Unbooked State */

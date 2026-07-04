@@ -68,8 +68,10 @@ const MyBookingsPage = () => {
 
   // Date/Time formatting helpers
   const formatDepartureTime = (timeString) => {
+    if (!timeString) return 'N/A';
     try {
       const date = new Date(timeString);
+      if (isNaN(date.getTime())) return 'N/A';
       return date.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
@@ -78,7 +80,7 @@ const MyBookingsPage = () => {
         minute: '2-digit'
       });
     } catch (e) {
-      return timeString;
+      return 'N/A';
     }
   };
 
@@ -91,19 +93,25 @@ const MyBookingsPage = () => {
     }
   };
 
+  // Helper: Determine if a booking is active
+  const isActiveBooking = (booking) => {
+    if (!booking) return false;
+    const isCancelled = booking.status === 'CANCELLED';
+    const ride = booking.rideId;
+    if (!ride) return false; // Defensive check for missing rideId
+
+    const isRideFinished = ride.status === 'COMPLETED' || ride.status === 'CANCELLED';
+    const isTimePassed = isPastDeparture(ride.departureTime);
+    const isRideActive = ride.status === 'ACTIVE';
+
+    // Active if booking is not cancelled, ride is not finished, and either the ride is active or departure is in the future
+    return !isCancelled && !isRideFinished && (isRideActive || !isTimePassed);
+  };
+
   // Filter bookings based on activeTab
   const filteredBookings = bookings.filter((b) => {
-    const isCancelled = b.status === 'CANCELLED';
-    const isRideFinished = b.rideId?.status === 'COMPLETED' || b.rideId?.status === 'CANCELLED';
-    const isTimePassed = isPastDeparture(b.rideId?.departureTime);
-
-    if (activeTab === 'active') {
-      // Active booking = booked status, ride is open or active, and departure is in the future
-      return !isCancelled && !isRideFinished && !isTimePassed;
-    } else {
-      // History/Cancelled = cancelled status, or ride completed/cancelled, or departure passed
-      return isCancelled || isRideFinished || isTimePassed;
-    }
+    const active = isActiveBooking(b);
+    return activeTab === 'active' ? active : !active;
   });
 
   // Render Status Badge
@@ -214,7 +222,7 @@ const MyBookingsPage = () => {
             transition: 'color 0.2s, border-color 0.2s'
           }}
         >
-          Active Bookings ({bookings.filter(b => b.status === 'BOOKED' && !isPastDeparture(b.rideId?.departureTime) && b.rideId?.status !== 'COMPLETED' && b.rideId?.status !== 'CANCELLED').length})
+          Active Bookings ({bookings.filter(isActiveBooking).length})
         </button>
         <button
           onClick={() => setActiveTab('history')}
@@ -351,15 +359,16 @@ const MyBookingsPage = () => {
                 {/* Footer buttons */}
                 <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                   <button
-                    onClick={() => navigate(`/rides/${ride._id}`)}
+                    onClick={() => ride._id && navigate(`/rides/${ride._id}`)}
+                    disabled={!ride._id}
                     className="btn btn-secondary"
-                    style={{ flex: 1, padding: '8px 12px', fontSize: '13px' }}
+                    style={{ flex: 1, padding: '8px 12px', fontSize: '13px', opacity: ride._id ? 1 : 0.5 }}
                   >
                     View Details
                   </button>
 
-                  {/* Cancel Booking only if status is BOOKED */}
-                  {!isCancelled && (
+                  {/* Cancel Booking only if status is BOOKED and ride status is CREATED */}
+                  {!isCancelled && ride.status === 'CREATED' && (
                     <button
                       onClick={() => handleCancelBooking(b._id)}
                       disabled={actionLoading}

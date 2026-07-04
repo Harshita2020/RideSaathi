@@ -32,7 +32,10 @@ export const rideAPI = {
   getAll: (params) => API.get('/rides', { params }),
   getDetails: (id) => API.get(`/rides/${id}`),
   update: (id, data) => API.put(`/rides/${id}`, data),
-  cancel: (id) => API.delete(`/rides/${id}`)
+  cancel: (id) => API.delete(`/rides/${id}`),
+  getMyOffered: () => API.get('/rides/my-offered'),
+  start: (id) => API.put(`/rides/${id}/start`),
+  complete: (id) => API.put(`/rides/${id}/complete`)
 };
 
 export const bookingAPI = {

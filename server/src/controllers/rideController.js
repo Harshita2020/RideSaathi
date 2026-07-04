@@ -218,10 +218,125 @@ const deleteRide = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Get rides offered by the logged-in user (Driver dashboard)
+ * @route   GET /api/rides/my-offered
+ * @access  Private
+ */
+const getMyOfferedRides = async (req, res) => {
+  try {
+    const driverId = req.user.id;
+
+    // Find all rides where driver is this user, sorted by departureTime ascending
+    const rides = await Ride.find({ driverId }).sort({ departureTime: 1 });
+
+    // Extend each ride with active bookings count
+    const ridesWithBookingCount = await Promise.all(
+      rides.map(async (ride) => {
+        const bookingCount = await Booking.countDocuments({ rideId: ride._id, status: 'BOOKED' });
+        const rideObj = ride.toObject();
+        rideObj.bookingCount = bookingCount;
+        return rideObj;
+      })
+    );
+
+    return res.status(200).json(ridesWithBookingCount);
+  } catch (error) {
+    console.error('Error in getMyOfferedRides:', error);
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * @desc    Start a ride (CREATED -> ACTIVE status transition)
+ * @route   PUT /api/rides/:id/start
+ * @access  Private
+ */
+const startRide = async (req, res) => {
+  try {
+    const rideId = req.params.id;
+    const userId = req.user.id;
+
+    const ride = await Ride.findById(rideId);
+    if (!ride) {
+      return res.status(404).json({ message: 'Ride not found' });
+    }
+
+    // Business Rule: Only the driver can start the ride
+    if (ride.driverId.toString() !== userId) {
+      return res.status(403).json({ message: 'Not authorized to start this ride' });
+    }
+
+    // Business Rule: Can only start if status is CREATED
+    if (ride.status !== 'CREATED') {
+      return res.status(400).json({ message: `Cannot start a ride with status '${ride.status}'` });
+    }
+
+    // Business Rule: Cannot start if departureTime is already in the past
+    // if (ride.departureTime < new Date()) {
+    //   return res.status(400).json({ message: 'Cannot start a ride whose departure time has already passed. Please update the schedule before starting.' });
+    // }
+
+    // Start the ride
+    ride.status = 'ACTIVE';
+    await ride.save();
+
+    return res.status(200).json({
+      message: 'Ride started successfully',
+      ride
+    });
+  } catch (error) {
+    console.error('Error in startRide:', error);
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * @desc    Complete a ride (ACTIVE -> COMPLETED status transition)
+ * @route   PUT /api/rides/:id/complete
+ * @access  Private
+ */
+const completeRide = async (req, res) => {
+  try {
+    const rideId = req.params.id;
+    const userId = req.user.id;
+
+    const ride = await Ride.findById(rideId);
+    if (!ride) {
+      return res.status(404).json({ message: 'Ride not found' });
+    }
+
+    // Business Rule: Only the driver can complete the ride
+    if (ride.driverId.toString() !== userId) {
+      return res.status(403).json({ message: 'Not authorized to complete this ride' });
+    }
+
+    // Business Rule: Can only complete if status is ACTIVE
+    if (ride.status !== 'ACTIVE') {
+      return res.status(400).json({ message: `Cannot complete a ride with status '${ride.status}'. Only active rides can be completed.` });
+    }
+
+    // Complete the ride
+    ride.status = 'COMPLETED';
+    await ride.save();
+
+    return res.status(200).json({
+      message: 'Ride completed successfully',
+      ride
+    });
+  } catch (error) {
+    console.error('Error in completeRide:', error);
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   createRide,
   getRides,
   getRideDetails,
   updateRide,
-  deleteRide
+  deleteRide,
+  getMyOfferedRides,
+  startRide,
+  completeRide
 };
