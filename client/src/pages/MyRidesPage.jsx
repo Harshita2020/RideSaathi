@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { rideAPI } from '../services/api';
+import { useSocket } from '../context/SocketContext';
 
 const MyRidesPage = () => {
   const navigate = useNavigate();
+  const { socket } = useSocket();
 
   // API states
   const [rides, setRides] = useState([]);
@@ -13,6 +15,12 @@ const MyRidesPage = () => {
   // Feedback states
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Geolocation tracking state
+  const [geoStatus, setGeoStatus] = useState(null); // null | 'tracking' | 'error'
+  const [geoError, setGeoError] = useState('');
+  const watchIdRef = useRef(null);      // navigator.geolocation watchId
+  const trackingRideRef = useRef(null); // rideId currently being tracked
 
   // Fetch driver's offered rides
   const fetchRides = async () => {
@@ -34,6 +42,95 @@ const MyRidesPage = () => {
   useEffect(() => {
     fetchRides();
   }, []);
+
+  // ── Driver Live Location Streaming ───────────────────────────────────────
+  useEffect(() => {
+    // Find the first ACTIVE ride (driver can only have one active at a time)
+    const activeRide = rides.find((r) => r.status === 'ACTIVE');
+
+    if (activeRide && socket) {
+      const rideId = activeRide._id;
+
+      // Already tracking this ride — nothing to do
+      if (trackingRideRef.current === rideId) return;
+
+      // Stop any previous watcher before starting a new one
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+
+      if (!navigator.geolocation) {
+        setGeoStatus('error');
+        setGeoError('Geolocation is not supported by this browser.');
+        return;
+      }
+
+      // Join the socket room for this ride so the server accepts location updates
+      socket.emit('join-ride-room', { rideId });
+      trackingRideRef.current = rideId;
+
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          socket.emit('update-location', { rideId, latitude, longitude });
+          setGeoStatus('tracking');
+          setGeoError('');
+        },
+        (err) => {
+          let msg = 'Location error.';
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              msg = 'Location permission denied. Passengers cannot see your position.';
+              break;
+            case err.POSITION_UNAVAILABLE:
+              msg = 'Location unavailable. Check your device GPS.';
+              break;
+            case err.TIMEOUT:
+              msg = 'Location request timed out. Retrying...';
+              break;
+            default:
+              msg = 'Unknown location error.';
+          }
+          console.warn('Geolocation error:', err);
+          setGeoStatus('error');
+          setGeoError(msg);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 5000,    // accept cached position up to 5s old
+          timeout: 15000
+        }
+      );
+
+      watchIdRef.current = watchId;
+    } else {
+      // No active ride — stop watching and leave room if we were tracking
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      if (trackingRideRef.current && socket) {
+        socket.emit('leave-ride-room', { rideId: trackingRideRef.current });
+      }
+      trackingRideRef.current = null;
+      setGeoStatus(null);
+      setGeoError('');
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      if (trackingRideRef.current && socket) {
+        socket.emit('leave-ride-room', { rideId: trackingRideRef.current });
+        trackingRideRef.current = null;
+      }
+    };
+  }, [rides, socket]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Handle Start Ride
   const handleStartRide = async (rideId) => {
@@ -325,6 +422,19 @@ const MyRidesPage = () => {
                     }}></div>
                   </div>
                 </div>
+
+                {/* Geo Status Banner (ACTIVE rides only) */}
+                {ride.status === 'ACTIVE' && geoStatus === 'tracking' && (
+                  <div style={{ fontSize: '11px', color: '#059669', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 'var(--radius-sm)', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
+                    Broadcasting live location
+                  </div>
+                )}
+                {ride.status === 'ACTIVE' && geoStatus === 'error' && (
+                  <div style={{ fontSize: '11px', color: '#991b1b', backgroundColor: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 'var(--radius-sm)', padding: '6px 10px' }}>
+                    ⚠️ {geoError}
+                  </div>
+                )}
 
                 {/* Card Actions Layout */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px' }}>
