@@ -149,7 +149,7 @@ The backend includes an automated Socket.IO integration test that validates:
 * Live Tracking
 * Integration Tests
 
-### Frontend Phase ⏳
+### Frontend Phase ✅
 
 * React Setup
 * Ride Search UI
@@ -165,6 +165,11 @@ The backend includes an automated Socket.IO integration test that validates:
 * Ride History
 * Notifications
 * Mobile PWA Support
+
+## Current bugs🪲
+* People should be able to book/share 1 ride at a time
+* The live location map has some issues- passengers cant see the driver location sometimes- NOT GOOD
+* The user needs to refresh the web-app to get recent updates- NOT GOOD
 
 ---
 
