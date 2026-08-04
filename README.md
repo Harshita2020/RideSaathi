@@ -170,6 +170,7 @@ The backend includes an automated Socket.IO integration test that validates:
 * People should be able to book/share 1 ride at a time
 * The live location map has some issues- passengers cant see the driver location sometimes- NOT GOOD
 * The user needs to refresh the web-app to get recent updates- NOT GOOD
+* Next feature- Add maps in start and end location as well 
 
 ---
 
